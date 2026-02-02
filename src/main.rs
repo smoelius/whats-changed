@@ -1,8 +1,7 @@
 use anyhow::{Result, bail, ensure};
+use elaborate::std::{fs::read_to_string_wc, path::PathContext, process::CommandContext};
 use semver::{BuildMetadata, Comparator, Op, Version, VersionReq};
-use std::{
-    convert::identity, env::args, fs::read_to_string, path::Path, process::Command, sync::LazyLock,
-};
+use std::{convert::identity, env::args, path::Path, process::Command, sync::LazyLock};
 use tempfile::tempdir;
 use walkdir::WalkDir;
 
@@ -28,7 +27,7 @@ fn clone_to(dir: &Path) -> Result<()> {
         "--quiet",
     ]);
     command.arg(dir);
-    let status = command.status()?;
+    let status = command.status_wc()?;
     ensure!(status.success(), "command failed: {command:?}");
     Ok(())
 }
@@ -37,7 +36,7 @@ fn checkout(dir: &Path, rev: &str) -> Result<()> {
     let mut command = Command::new("git");
     command.args(["checkout", "--quiet", rev]);
     command.current_dir(dir);
-    let status = command.status()?;
+    let status = command.status_wc()?;
     ensure!(status.success(), "command failed: {command:?}");
     Ok(())
 }
@@ -49,9 +48,9 @@ fn compare_repo_to_curr(tempdir_path: &Path) -> Result<()> {
             continue;
         }
         let path_curr = dir_entry.path();
-        let relative_path = path_curr.strip_prefix(".").unwrap();
+        let relative_path = path_curr.strip_prefix_wc(".").unwrap();
         let path_prev = tempdir_path.join(relative_path);
-        if !path_prev.try_exists()? {
+        if !path_prev.try_exists_wc()? {
             eprintln!(
                 "`{}` does not exists in previous revision",
                 relative_path.display()
@@ -75,7 +74,7 @@ fn compare_manifests_at_paths(
 }
 
 fn read_manifest(manifest_path: impl AsRef<Path>) -> Result<toml::Table> {
-    let contents = read_to_string(manifest_path)?;
+    let contents = read_to_string_wc(manifest_path)?;
     contents.parse::<toml::Table>().map_err(Into::into)
 }
 
