@@ -117,10 +117,10 @@ fn compare_deps_tables(relative_path: &Path, deps_prev: &toml::Table, deps_curr:
                 .peek()
                 .is_some_and(|&(name_curr, _)| name_prev != name_curr)
             {
-                return Ok(Some(format!("    `{name_prev}` removed")));
+                return Ok(Some(format!("`{name_prev}` removed")));
             }
             let Some((_, value_curr)) = iter_curr.next() else {
-                return Ok(Some(format!("    `{name_prev}` removed")));
+                return Ok(Some(format!("`{name_prev}` removed")));
             };
             compare_deps(name_prev, value_prev, value_curr)
         })();
