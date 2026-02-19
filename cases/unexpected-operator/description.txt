@@ -1,0 +1,2 @@
+Tests that whats-changed gracefully reports an error when a dependency uses a
+version operator (tilde) that minimum_version_for_req does not support.

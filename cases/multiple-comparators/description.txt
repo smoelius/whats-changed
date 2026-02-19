@@ -1,0 +1,3 @@
+Tests that whats-changed gracefully reports an error when a dependency's version
+requirement contains more than one comparator (e.g., ">=1.0, <2.0"), which
+minimum_version_for_req does not support.

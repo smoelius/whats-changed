@@ -1,0 +1,2 @@
+Tests that whats-changed exits with a non-zero status and an appropriate error
+message when invoked with no arguments instead of the required one.

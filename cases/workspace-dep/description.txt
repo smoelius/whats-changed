@@ -1,0 +1,2 @@
+Tests that whats-changed silently skips dependencies inherited from a workspace
+(i.e., those with "workspace = true"), producing no output.

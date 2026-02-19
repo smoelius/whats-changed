@@ -1,0 +1,3 @@
+Tests that when multiple dependencies are upgraded, the manifest path is printed
+only once (the second call to maybe_print_path is a no-op because the path was
+already printed for the first upgrade).

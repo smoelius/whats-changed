@@ -1,0 +1,3 @@
+Tests the code path where a removed dependency is detected via the peek-ahead
+check: the previous list has [aaa, bbb] and the current list has only [bbb],
+so aaa is identified as removed by peeking at the current iterator.

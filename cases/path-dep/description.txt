@@ -1,0 +1,2 @@
+Tests that whats-changed silently skips dependencies specified as path
+dependencies (i.e., those with a "path" key), producing no output.
