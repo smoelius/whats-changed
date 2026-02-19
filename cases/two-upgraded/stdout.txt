@@ -1,0 +1,3 @@
+Cargo.toml
+    `bar` upgraded to version 2.0
+    `foo` upgraded to version 2.0

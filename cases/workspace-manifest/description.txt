@@ -1,0 +1,3 @@
+Tests that whats-changed correctly reads dependencies from a workspace-level
+Cargo.toml (i.e., under [workspace.dependencies]) rather than a per-crate
+[dependencies] table.

@@ -1,0 +1,2 @@
+Tests that whats-changed produces no output when a dependency's version
+requirement is the same in both the previous and current Cargo.toml.

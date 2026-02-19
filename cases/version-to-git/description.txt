@@ -1,0 +1,3 @@
+Tests that whats-changed produces no output when a dependency changes from a
+versioned requirement in the previous Cargo.toml to a git dependency in the
+current one (git dependencies are skipped, so no upgrade is reported).

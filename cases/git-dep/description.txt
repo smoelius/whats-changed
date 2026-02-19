@@ -1,0 +1,2 @@
+Tests that whats-changed silently skips dependencies specified as git
+dependencies (i.e., those with a "git" key), producing no output.

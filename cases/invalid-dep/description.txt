@@ -1,0 +1,3 @@
+Tests that whats-changed gracefully reports an error when a dependency has no
+recognizable version specifier (no "version", "git", "path", or "workspace"
+key), continuing rather than aborting.

@@ -1,0 +1,2 @@
+Tests that whats-changed reports a dependency that was present in the previous
+Cargo.toml but absent from the current one.

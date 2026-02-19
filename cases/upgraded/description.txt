@@ -1,0 +1,2 @@
+Tests that whats-changed reports a dependency whose minimum required version
+increased between the previous and current Cargo.toml.

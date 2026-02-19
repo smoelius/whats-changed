@@ -1,0 +1,2 @@
+Tests that whats-changed produces no output when both the previous and current
+Cargo.toml are empty (no dependencies).

@@ -1,0 +1,3 @@
+Tests that whats-changed emits a warning to stderr when a Cargo.toml is found
+in the current working tree but has no counterpart in the previous revision
+(i.e., it is a newly added package).
