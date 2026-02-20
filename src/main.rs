@@ -52,7 +52,7 @@ fn compare_repo_to_curr(tempdir_path: &Path) -> Result<()> {
         let path_prev = tempdir_path.join(relative_path);
         if !path_prev.try_exists_wc()? {
             eprintln!(
-                "`{}` does not exists in previous revision",
+                "`{}` does not exist in previous revision",
                 relative_path.display()
             );
             continue;
