@@ -1,0 +1,2 @@
+Tests that inserting a new dependency between two existing ones does not
+cause the subsequent dependencies to be incorrectly reported as removed.

@@ -62,6 +62,13 @@ fn run_case(case_dir: &Path) {
     let prev_rev = String::from_utf8(rev_parse.get_output().stdout.clone()).unwrap();
     let prev_rev = prev_rev.trim();
 
+    let tag_path = case_dir.join("tag.txt");
+    if tag_path.exists() {
+        let tag = read_to_string_wc(&tag_path).unwrap();
+        let tag = tag.trim();
+        git(&["tag", tag]).current_dir(repo_dir).assert().success();
+    }
+
     copy_wc(case_dir.join("after.toml"), repo_dir.join("Cargo.toml")).unwrap();
 
     let extra_dir = case_dir.join("extra");
@@ -69,6 +76,11 @@ fn run_case(case_dir: &Path) {
         let repo_extra_dir = repo_dir.join("extra");
         create_dir_all_wc(&repo_extra_dir).unwrap();
         copy_dir(&extra_dir, &repo_extra_dir);
+        // Stage the extra files so that `git ls-files` includes them.
+        git(&["add", "extra"])
+            .current_dir(repo_dir)
+            .assert()
+            .success();
     }
 
     let expected_status: i32 = read_to_string_wc(case_dir.join("status.txt"))

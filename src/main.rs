@@ -2,90 +2,76 @@ use anyhow::{Result, bail, ensure};
 use elaborate::std::{fs::read_to_string_wc, path::PathContext, process::CommandContext};
 use semver::{BuildMetadata, Comparator, Op, Version, VersionReq};
 use std::{convert::identity, env::args, path::Path, process::Command, sync::LazyLock};
-use tempfile::tempdir;
-use walkdir::WalkDir;
 
 fn main() -> Result<()> {
     let args = args().collect::<Vec<_>>();
-    let [_, prev_rev] = args.as_slice() else {
-        bail!("expect one argument: previous revision");
+    let prev_rev = match args.as_slice() {
+        [_, prev_rev] => prev_rev.clone(),
+        [_] => {
+            let tag = most_recent_tag()?;
+            eprintln!("No revision specified; using most recent tag: {tag}");
+            tag
+        }
+        _ => bail!("expect at most one argument: previous revision"),
     };
-    let tempdir = tempdir()?;
-    let tempdir_path = tempdir.path();
-    clone_to(tempdir_path)?;
-    checkout(tempdir_path, prev_rev)?;
-    compare_repo_to_curr(tempdir_path)?;
+    compare_repo_to_curr(&prev_rev)?;
     Ok(())
 }
 
-fn clone_to(dir: &Path) -> Result<()> {
+fn most_recent_tag() -> Result<String> {
     let mut command = Command::new("git");
-    command.args([
-        "clone",
-        ".",
-        "--config=advice.detachedHead=false",
-        "--quiet",
-    ]);
-    command.arg(dir);
-    let status = command.status_wc()?;
-    ensure!(status.success(), "command failed: {command:?}");
-    Ok(())
+    command.args(["describe", "--tags", "--abbrev=0"]);
+    let output = command.output_wc()?;
+    ensure!(
+        output.status.success(),
+        "no previous tag found; specify a revision explicitly"
+    );
+    let tag = std::str::from_utf8(&output.stdout)?.trim().to_string();
+    Ok(tag)
 }
 
-fn checkout(dir: &Path, rev: &str) -> Result<()> {
+fn compare_repo_to_curr(prev_rev: &str) -> Result<()> {
     let mut command = Command::new("git");
-    command.args(["checkout", "--quiet", rev]);
-    command.current_dir(dir);
-    let status = command.status_wc()?;
-    ensure!(status.success(), "command failed: {command:?}");
-    Ok(())
-}
-
-fn compare_repo_to_curr(tempdir_path: &Path) -> Result<()> {
-    for result in WalkDir::new(".") {
-        let dir_entry = result?;
-        if dir_entry.file_name() != "Cargo.toml" {
+    command.args(["ls-files"]);
+    let output = command.output_wc()?;
+    ensure!(output.status.success(), "command failed: {command:?}");
+    for line in output.stdout.split(|&byte| byte == b'\n') {
+        if line.is_empty() {
             continue;
         }
-        let path_curr = dir_entry.path();
-        let relative_path = path_curr.strip_prefix_wc(".").unwrap();
-        let path_prev = tempdir_path.join(relative_path);
-        if !path_prev.try_exists_wc()? {
+        let path_curr_str = std::str::from_utf8(line)?;
+        let path_curr = Path::new(path_curr_str);
+        if path_curr.file_name_wc()? != "Cargo.toml" {
+            continue;
+        }
+        let mut command = Command::new("git");
+        command.args(["show", &format!("{prev_rev}:{path_curr_str}")]);
+        let output = command.output_wc()?;
+        if !output.status.success() {
             eprintln!(
                 "`{}` does not exist in previous revision",
-                relative_path.display()
+                path_curr.display()
             );
             continue;
         }
-        compare_manifests_at_paths(relative_path, &path_prev, path_curr)?;
+        let contents_prev = std::str::from_utf8(&output.stdout)?;
+        let manifest_prev = contents_prev.parse::<toml::Table>()?;
+        let manifest_curr = read_manifest(path_curr)?;
+        compare_manifests(&manifest_prev, &manifest_curr, path_curr);
     }
     Ok(())
 }
 
-fn compare_manifests_at_paths(
-    relative_path: &Path,
-    path_prev: &Path,
-    path_curr: &Path,
-) -> Result<()> {
-    let manifest_prev = read_manifest(path_prev)?;
-    let manifest_curr = read_manifest(path_curr)?;
-    compare_manifests(relative_path, &manifest_prev, &manifest_curr);
-    Ok(())
-}
 
 fn read_manifest(manifest_path: impl AsRef<Path>) -> Result<toml::Table> {
     let contents = read_to_string_wc(manifest_path)?;
     contents.parse::<toml::Table>().map_err(Into::into)
 }
 
-fn compare_manifests(
-    relative_path: &Path,
-    manifest_prev: &toml::Table,
-    manifest_curr: &toml::Table,
-) {
+fn compare_manifests(manifest_prev: &toml::Table, manifest_curr: &toml::Table, path_curr: &Path) {
     let deps_prev = get_deps_table(manifest_prev);
     let deps_curr = get_deps_table(manifest_curr);
-    compare_deps_tables(relative_path, deps_prev, deps_curr);
+    compare_deps_tables(deps_prev, deps_curr, path_curr);
 }
 
 fn get_deps_table(manifest: &toml::Table) -> &toml::Table {
@@ -108,18 +94,11 @@ fn get_deps_table(manifest: &toml::Table) -> &toml::Table {
     }
 }
 
-fn compare_deps_tables(relative_path: &Path, deps_prev: &toml::Table, deps_curr: &toml::Table) {
+fn compare_deps_tables(deps_prev: &toml::Table, deps_curr: &toml::Table, path_curr: &Path) {
     let mut path_printed = false;
-    let mut iter_curr = deps_curr.iter().peekable();
     for (name_prev, value_prev) in deps_prev {
         let result = (|| {
-            if iter_curr
-                .peek()
-                .is_some_and(|&(name_curr, _)| name_prev != name_curr)
-            {
-                return Ok(Some(format!("`{name_prev}` removed")));
-            }
-            let Some((_, value_curr)) = iter_curr.next() else {
+            let Some(value_curr) = deps_curr.get(name_prev) else {
                 return Ok(Some(format!("`{name_prev}` removed")));
             };
             compare_deps(name_prev, value_prev, value_curr)
@@ -127,11 +106,11 @@ fn compare_deps_tables(relative_path: &Path, deps_prev: &toml::Table, deps_curr:
         match result {
             Ok(None) => {}
             Ok(Some(msg)) => {
-                maybe_print_path(&mut path_printed, relative_path);
+                maybe_print_path(&mut path_printed, path_curr);
                 println!("    {msg}");
             }
             Err(err) => {
-                maybe_print_path(&mut path_printed, relative_path);
+                maybe_print_path(&mut path_printed, path_curr);
                 eprintln!("failed to compare `{name_prev}`: {err}");
             }
         }

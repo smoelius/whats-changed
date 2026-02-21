@@ -25,8 +25,14 @@ whats-changed PREVIOUS
 
 1. Clone the current repository into a temporary directory.
 2. Checkout `PREVIOUS`.
-3. For each dependency in each Cargo.toml file in the current directory, compute the minimum version satisfying the dependency's version requirement.
+3. For each dependency in the `[dependencies]` and `[workspace.dependencies]` sections of each Cargo.toml file in the current directory, compute the minimum version satisfying the dependency's version requirement.
 4. If the minimum version does not satisfy the requirement in `PREVIOUS`'s corresponding Cargo.toml file, report that the dependency was upgraded.
+5. If the dependency does not appear in `PREVIOUS`'s corresponding Cargo.toml file, report that it was removed.
+
+Notes:
+
+- `[dev-dependencies]` and `[build-dependencies]` are intentionally ignored.
+- Newly added dependencies are intentionally not reported; only upgrades and removals are.
 
 ## Known problems
 
