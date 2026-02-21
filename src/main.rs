@@ -2,45 +2,17 @@ use anyhow::{Result, bail, ensure};
 use elaborate::std::{fs::read_to_string_wc, path::PathContext, process::CommandContext};
 use semver::{BuildMetadata, Comparator, Op, Version, VersionReq};
 use std::{convert::identity, env::args, path::Path, process::Command, sync::LazyLock};
-use tempfile::tempdir;
 
 fn main() -> Result<()> {
     let args = args().collect::<Vec<_>>();
     let [_, prev_rev] = args.as_slice() else {
         bail!("expect one argument: previous revision");
     };
-    let tempdir = tempdir()?;
-    let tempdir_path = tempdir.path();
-    clone_to(tempdir_path)?;
-    checkout(tempdir_path, prev_rev)?;
-    compare_repo_to_curr(tempdir_path)?;
+    compare_repo_to_curr(prev_rev)?;
     Ok(())
 }
 
-fn clone_to(dir: &Path) -> Result<()> {
-    let mut command = Command::new("git");
-    command.args([
-        "clone",
-        ".",
-        "--config=advice.detachedHead=false",
-        "--quiet",
-    ]);
-    command.arg(dir);
-    let status = command.status_wc()?;
-    ensure!(status.success(), "command failed: {command:?}");
-    Ok(())
-}
-
-fn checkout(dir: &Path, rev: &str) -> Result<()> {
-    let mut command = Command::new("git");
-    command.args(["checkout", "--quiet", rev]);
-    command.current_dir(dir);
-    let status = command.status_wc()?;
-    ensure!(status.success(), "command failed: {command:?}");
-    Ok(())
-}
-
-fn compare_repo_to_curr(tempdir_path: &Path) -> Result<()> {
+fn compare_repo_to_curr(prev_rev: &str) -> Result<()> {
     let mut command = Command::new("git");
     command.args(["ls-files"]);
     let output = command.output_wc()?;
@@ -54,8 +26,10 @@ fn compare_repo_to_curr(tempdir_path: &Path) -> Result<()> {
         if path_curr.file_name_wc()? != "Cargo.toml" {
             continue;
         }
-        let path_prev = tempdir_path.join(path_curr);
-        if !path_prev.try_exists_wc()? {
+        let mut command = Command::new("git");
+        command.args(["show", &format!("{prev_rev}:{path_curr_str}")]);
+        let output = command.output_wc()?;
+        if !output.status.success() {
             eprintln!(
                 "`{}` does not exist in previous revision",
                 path_curr.display()
