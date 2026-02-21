@@ -110,16 +110,9 @@ fn get_deps_table(manifest: &toml::Table) -> &toml::Table {
 
 fn compare_deps_tables(relative_path: &Path, deps_prev: &toml::Table, deps_curr: &toml::Table) {
     let mut path_printed = false;
-    let mut iter_curr = deps_curr.iter().peekable();
     for (name_prev, value_prev) in deps_prev {
         let result = (|| {
-            if iter_curr
-                .peek()
-                .is_some_and(|&(name_curr, _)| name_prev != name_curr)
-            {
-                return Ok(Some(format!("`{name_prev}` removed")));
-            }
-            let Some((_, value_curr)) = iter_curr.next() else {
+            let Some(value_curr) = deps_curr.get(name_prev) else {
                 return Ok(Some(format!("`{name_prev}` removed")));
             };
             compare_deps(name_prev, value_prev, value_curr)
