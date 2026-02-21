@@ -5,11 +5,30 @@ use std::{convert::identity, env::args, path::Path, process::Command, sync::Lazy
 
 fn main() -> Result<()> {
     let args = args().collect::<Vec<_>>();
-    let [_, prev_rev] = args.as_slice() else {
-        bail!("expect one argument: previous revision");
+    let prev_rev = match args.as_slice() {
+        [_, prev_rev] => prev_rev.clone(),
+        [_] => {
+            let tag = most_recent_tag()?;
+            eprintln!("No revision specified; using most recent tag: {tag}");
+            tag
+        }
+        _ => bail!("expect at most one argument: previous revision"),
     };
-    compare_repo_to_curr(prev_rev)?;
+    compare_repo_to_curr(&prev_rev)?;
     Ok(())
+}
+
+fn most_recent_tag() -> Result<String> {
+    let mut command = Command::new("git");
+    command.args(["describe", "--tags", "--abbrev=0"]);
+    let output = command.output_wc()?;
+    ensure!(
+        output.status.success(),
+        "no previous tag found; specify a revision explicitly"
+    );
+    let stdout = std::str::from_utf8(&output.stdout)?;
+    let tag = stdout.trim().to_string();
+    Ok(tag)
 }
 
 fn compare_repo_to_curr(prev_rev: &str) -> Result<()> {
