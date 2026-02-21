@@ -1,1 +1,1 @@
-Error: expect one argument: previous revision
+No revision specified; using most recent tag: v0.1.0

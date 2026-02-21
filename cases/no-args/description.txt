@@ -1,2 +1,2 @@
-Tests that whats-changed exits with a non-zero status and an appropriate error
-message when invoked with no arguments instead of the required one.
+Tests that when no revision is specified, whats-changed uses the most recent
+tag and informs the user on stderr.

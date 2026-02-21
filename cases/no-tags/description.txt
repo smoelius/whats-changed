@@ -1,0 +1,2 @@
+Tests that when no revision is specified and no tag exists, whats-changed exits
+with a non-zero status and an appropriate error message.
