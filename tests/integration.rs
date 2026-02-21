@@ -69,6 +69,11 @@ fn run_case(case_dir: &Path) {
         let repo_extra_dir = repo_dir.join("extra");
         create_dir_all_wc(&repo_extra_dir).unwrap();
         copy_dir(&extra_dir, &repo_extra_dir);
+        // Stage the extra files so that `git ls-files` includes them.
+        git(&["add", "extra"])
+            .current_dir(repo_dir)
+            .assert()
+            .success();
     }
 
     let expected_status: i32 = read_to_string_wc(case_dir.join("status.txt"))
