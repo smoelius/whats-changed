@@ -1,12 +1,5 @@
 use assert_cmd::assert::OutputAssertExt;
-use std::{env::remove_var, process::Command};
-
-#[ctor::ctor]
-fn initialize() {
-    unsafe {
-        remove_var("CARGO_TERM_COLOR");
-    }
-}
+use std::process::Command;
 
 #[test]
 fn clippy() {
