@@ -8,10 +8,10 @@ repository = "https://github.com/smoelius/whats-changed"
 
 [dependencies]
 anyhow = "1.0"
-elaborate = "0.2"
+elaborate = "1.1"
 semver = "1.0"
-toml = "1.0"
+toml = "1.1"
 
 [dev-dependencies]
-assert_cmd = "2.1"
-tempfile = "3.26"
+assert_cmd = "2.2"
+tempfile = "3.27"
