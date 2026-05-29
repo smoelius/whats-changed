@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0
+
+- FEATURE: Dependency updates in unpublished packages are ignored ([8dfdc17](https://github.com/smoelius/whats-changed/commit/8dfdc173a7790b6c54f13a19fe5078ee1a35d4e8))
+- Dependency updates
+  - `elaborate` upgraded to version 1
+
 ## 0.2.0
 
 - Eliminate double indentation preceding "removed" messages ([c06cf35](https://github.com/smoelius/whats-changed/commit/c06cf35d421844e31a599a1e6d70feb2850844b9))
