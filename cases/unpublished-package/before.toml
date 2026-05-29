@@ -1,0 +1,8 @@
+[package]
+name = "unpublished-package"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+foo = "1.0"

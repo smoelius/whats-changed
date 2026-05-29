@@ -45,6 +45,10 @@ fn compare_repo_to_curr(prev_rev: &str) -> Result<()> {
         if path_curr.file_name_wc()? != "Cargo.toml" {
             continue;
         }
+        let manifest_curr = read_manifest(path_curr)?;
+        if get_publish(&manifest_curr).is_some_and(|publish| !publish) {
+            continue;
+        }
         let mut command = Command::new("git");
         command.args(["show", &format!("{prev_rev}:{path_curr_str}")]);
         let output = command.output_wc()?;
@@ -57,7 +61,6 @@ fn compare_repo_to_curr(prev_rev: &str) -> Result<()> {
         }
         let contents_prev = std::str::from_utf8(&output.stdout)?;
         let manifest_prev = contents_prev.parse::<toml::Table>()?;
-        let manifest_curr = read_manifest(path_curr)?;
         compare_manifests(path_curr, &manifest_prev, &manifest_curr);
     }
     Ok(())
@@ -66,6 +69,14 @@ fn compare_repo_to_curr(prev_rev: &str) -> Result<()> {
 fn read_manifest(manifest_path: impl AsRef<Path>) -> Result<toml::Table> {
     let contents = read_to_string_wc(manifest_path)?;
     contents.parse::<toml::Table>().map_err(Into::into)
+}
+
+fn get_publish(manifest: &toml::Table) -> Option<bool> {
+    manifest
+        .get("package")
+        .and_then(toml::Value::as_table)
+        .and_then(|table| table.get("publish"))
+        .and_then(toml::Value::as_bool)
 }
 
 fn compare_manifests(path_curr: &Path, manifest_prev: &toml::Table, manifest_curr: &toml::Table) {
