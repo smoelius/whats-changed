@@ -28,15 +28,21 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
+            ~/.cargo/git/checkouts/
+            ~/.dylint_drivers/
             ~/.rustup/toolchains/
+            target/dylint
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-dylint, dylint-link
 
       - name: Install tools
         run: |
           rustup update
           rustup install nightly
           rustup component add clippy --toolchain nightly
-          cargo install cargo-dylint dylint-link || true
           cargo install unset                    || true
 
       - name: Test
