@@ -1,2 +1,5 @@
+[package]
+name = "test-package"
+
 [dependencies]
 foo = { workspace = true }

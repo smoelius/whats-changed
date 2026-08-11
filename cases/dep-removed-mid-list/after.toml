@@ -1,2 +1,5 @@
+[package]
+name = "test-package"
+
 [dependencies]
 bbb = "1.0"

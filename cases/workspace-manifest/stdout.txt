@@ -1,2 +1,3 @@
-Cargo.toml
-    `foo` upgraded to version 2.0
+## Workspace
+
+- `foo` upgraded to version 2.0
