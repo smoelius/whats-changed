@@ -3,6 +3,40 @@ use elaborate::std::{fs::read_to_string_wc, path::PathContext, process::CommandC
 use semver::{BuildMetadata, Comparator, Op, Version, VersionReq};
 use std::{convert::identity, env::args, path::Path, process::Command, sync::LazyLock};
 
+#[derive(Clone, Copy)]
+enum DependencyOwner<'a> {
+    Workspace,
+    Package(&'a str),
+}
+
+struct Section {
+    heading: String,
+    messages: Vec<String>,
+}
+
+impl Section {
+    fn new(owner: DependencyOwner<'_>, messages: Vec<String>) -> Self {
+        let heading = match owner {
+            DependencyOwner::Workspace => String::from("Workspace"),
+            DependencyOwner::Package(name) => format!("Package: `{name}`"),
+        };
+        Self { heading, messages }
+    }
+}
+
+impl std::fmt::Display for Section {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "## {}", self.heading)?;
+        if let Some((first, rest)) = self.messages.split_first() {
+            write!(formatter, "\n\n- {first}")?;
+            for message in rest {
+                write!(formatter, "\n- {message}")?;
+            }
+        }
+        Ok(())
+    }
+}
+
 fn main() -> Result<()> {
     let args = args().collect::<Vec<_>>();
     let prev_rev = match args.as_slice() {
@@ -36,6 +70,7 @@ fn compare_repo_to_curr(prev_rev: &str) -> Result<()> {
     command.args(["ls-files"]);
     let output = command.output_wc()?;
     ensure!(output.status.success(), "command failed: {command:?}");
+    let mut sections = Vec::new();
     for line in output.stdout.split(|&byte| byte == b'\n') {
         if line.is_empty() {
             continue;
@@ -61,7 +96,16 @@ fn compare_repo_to_curr(prev_rev: &str) -> Result<()> {
         }
         let contents_prev = std::str::from_utf8(&output.stdout)?;
         let manifest_prev = contents_prev.parse::<toml::Table>()?;
-        compare_manifests(path_curr, &manifest_prev, &manifest_curr);
+        let manifest_sections = compare_manifests(&manifest_prev, &manifest_curr)?;
+        sections.extend(manifest_sections);
+    }
+    if !sections.is_empty() {
+        let markdown = sections
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("\n\n");
+        println!("{markdown}");
     }
     Ok(())
 }
@@ -79,30 +123,78 @@ fn get_publish(manifest: &toml::Table) -> Option<bool> {
         .and_then(toml::Value::as_bool)
 }
 
-fn compare_manifests(path_curr: &Path, manifest_prev: &toml::Table, manifest_curr: &toml::Table) {
+fn compare_manifests(
+    manifest_prev: &toml::Table,
+    manifest_curr: &toml::Table,
+) -> Result<Vec<Section>> {
     static EMPTY: LazyLock<toml::Table> = LazyLock::new(toml::Table::default);
 
-    let mut path_printed = false;
-    compare_deps_tables(
-        &mut path_printed,
-        path_curr,
-        get_workspace_deps_table(manifest_prev).unwrap_or(&EMPTY),
-        get_workspace_deps_table(manifest_curr).unwrap_or(&EMPTY),
-    );
-    compare_deps_tables(
-        &mut path_printed,
-        path_curr,
-        get_package_deps_table(manifest_prev).unwrap_or(&EMPTY),
-        get_package_deps_table(manifest_curr).unwrap_or(&EMPTY),
-    );
+    let workspace_deps_prev = get_workspace_deps_table(manifest_prev);
+    let workspace_deps_curr = get_workspace_deps_table(manifest_curr);
+    let package_deps_prev = get_package_deps_table(manifest_prev)?;
+    let package_deps_curr = get_package_deps_table(manifest_curr)?;
+
+    let mut sections = Vec::new();
+    if let Some(messages) = compare_deps_tables(
+        workspace_deps_prev.map_or(&EMPTY, |(deps, _)| deps),
+        workspace_deps_curr.map_or(&EMPTY, |(deps, _)| deps),
+    ) {
+        let owner = workspace_deps_curr
+            .map(|(_, owner)| owner)
+            .or_else(|| workspace_deps_prev.map(|(_, owner)| owner))
+            .unwrap();
+        sections.push(Section::new(owner, messages));
+    }
+
+    if let Some(messages) = compare_deps_tables(
+        package_deps_prev.map_or(&EMPTY, |(deps, _)| deps),
+        package_deps_curr.map_or(&EMPTY, |(deps, _)| deps),
+    ) {
+        let owner = package_deps_curr
+            .map(|(_, owner)| owner)
+            .or_else(|| package_deps_prev.map(|(_, owner)| owner))
+            .unwrap();
+        sections.push(Section::new(owner, messages));
+    }
+    Ok(sections)
 }
 
-fn compare_deps_tables(
-    path_printed: &mut bool,
-    path_curr: &Path,
-    deps_prev: &toml::Table,
-    deps_curr: &toml::Table,
-) {
+fn get_workspace_deps_table(manifest: &toml::Table) -> Option<(&toml::Table, DependencyOwner<'_>)> {
+    let deps = manifest
+        .get("workspace")
+        .and_then(|value| value.as_table())
+        .and_then(|table| table.get("dependencies"))
+        .and_then(|value| value.as_table())?;
+    Some((deps, DependencyOwner::Workspace))
+}
+
+fn get_package_deps_table(
+    manifest: &toml::Table,
+) -> Result<Option<(&toml::Table, DependencyOwner<'_>)>> {
+    if let Some(deps) = manifest
+        .get("dependencies")
+        .and_then(|value| value.as_table())
+    {
+        let Some(name) = get_package_name(manifest) else {
+            bail!("package manifest has no name");
+        };
+        Ok(Some((deps, DependencyOwner::Package(name))))
+    } else {
+        Ok(None)
+    }
+}
+
+fn get_package_name(manifest: &toml::Table) -> Option<&str> {
+    manifest
+        .get("package")
+        .and_then(toml::Value::as_table)
+        .and_then(|table| table.get("name"))
+        .and_then(toml::Value::as_str)
+}
+
+fn compare_deps_tables(deps_prev: &toml::Table, deps_curr: &toml::Table) -> Option<Vec<String>> {
+    let mut had_errors = false;
+    let mut messages = Vec::new();
     for (name_prev, value_prev) in deps_prev {
         let result = (|| {
             let Some(value_curr) = deps_curr.get(name_prev) else {
@@ -113,29 +205,15 @@ fn compare_deps_tables(
         match result {
             Ok(None) => {}
             Ok(Some(msg)) => {
-                maybe_print_path(path_printed, path_curr);
-                println!("    {msg}");
+                messages.push(msg);
             }
             Err(err) => {
-                maybe_print_path(path_printed, path_curr);
+                had_errors = true;
                 eprintln!("failed to compare `{name_prev}`: {err}");
             }
         }
     }
-}
-
-fn get_workspace_deps_table(manifest: &toml::Table) -> Option<&toml::Table> {
-    manifest
-        .get("workspace")
-        .and_then(|value| value.as_table())
-        .and_then(|table| table.get("dependencies"))
-        .and_then(|value| value.as_table())
-}
-
-fn get_package_deps_table(manifest: &toml::Table) -> Option<&toml::Table> {
-    manifest
-        .get("dependencies")
-        .and_then(|value| value.as_table())
+    (!messages.is_empty() || had_errors).then_some(messages)
 }
 
 fn compare_deps(
@@ -205,14 +283,6 @@ fn get_req_from_value(value: &toml::Value) -> Result<Option<VersionReq>> {
     };
     let req = req.parse::<VersionReq>()?;
     Ok(Some(req))
-}
-
-fn maybe_print_path(printed: &mut bool, path: &Path) {
-    if *printed {
-        return;
-    }
-    println!("{}", path.display());
-    *printed = true;
 }
 
 fn minimum_version_for_req(req: &VersionReq) -> Result<Version> {

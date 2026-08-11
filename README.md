@@ -4,11 +4,12 @@ Show Rust dependencies that were upgraded or removed
 
 Example output:
 
-```
-backends/Cargo.toml
-    `swc_core` upgraded to version 55.0
-    `toml_edit` upgraded to version 0.24
-    `tree-sitter` upgraded to version 0.26
+```markdown
+## Package: `swc_ecma_parser`
+
+- `swc_core` upgraded to version 55.0
+- `toml_edit` upgraded to version 0.24
+- `tree-sitter` upgraded to version 0.26
 ```
 
 ## How to run
