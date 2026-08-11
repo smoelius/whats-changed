@@ -1,2 +1,3 @@
-Cargo.toml
-    `foo` removed
+## Package: `test-package`
+
+- `foo` removed

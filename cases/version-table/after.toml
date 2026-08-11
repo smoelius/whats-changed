@@ -1,2 +1,5 @@
+[package]
+name = "test-package"
+
 [dependencies]
 foo = { version = "2.0" }

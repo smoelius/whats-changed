@@ -1,3 +1,6 @@
+[package]
+name = "test-package"
+
 [dependencies]
 bar = "2.0"
 foo = "2.0"
