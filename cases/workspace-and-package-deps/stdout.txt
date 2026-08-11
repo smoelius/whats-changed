@@ -1,3 +1,7 @@
-Cargo.toml
-    `workspace_dep` upgraded to version 2.0
-    `package_dep` upgraded to version 2.0
+## Workspace
+
+- `workspace_dep` upgraded to version 2.0
+
+## Package: `test`
+
+- `package_dep` upgraded to version 2.0
