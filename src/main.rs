@@ -80,33 +80,29 @@ fn get_publish(manifest: &toml::Table) -> Option<bool> {
 }
 
 fn compare_manifests(path_curr: &Path, manifest_prev: &toml::Table, manifest_curr: &toml::Table) {
-    let deps_prev = get_deps_table(manifest_prev);
-    let deps_curr = get_deps_table(manifest_curr);
-    compare_deps_tables(path_curr, deps_prev, deps_curr);
-}
-
-fn get_deps_table(manifest: &toml::Table) -> &toml::Table {
     static EMPTY: LazyLock<toml::Table> = LazyLock::new(toml::Table::default);
-    if let Some(deps) = manifest
-        .get("dependencies")
-        .and_then(|value| value.as_table())
-    {
-        deps
-    } else if let Some(deps) = manifest
-        .get("workspace")
-        .and_then(|value| value.as_table())
-        .and_then(|table| table.get("dependencies"))
-        .and_then(|value| value.as_table())
-    {
-        deps
-    } else {
-        // smoelius: Manifest has no `dependencies` table.
-        &EMPTY
-    }
+
+    let mut path_printed = false;
+    compare_deps_tables(
+        &mut path_printed,
+        path_curr,
+        get_workspace_deps_table(manifest_prev).unwrap_or(&EMPTY),
+        get_workspace_deps_table(manifest_curr).unwrap_or(&EMPTY),
+    );
+    compare_deps_tables(
+        &mut path_printed,
+        path_curr,
+        get_package_deps_table(manifest_prev).unwrap_or(&EMPTY),
+        get_package_deps_table(manifest_curr).unwrap_or(&EMPTY),
+    );
 }
 
-fn compare_deps_tables(path_curr: &Path, deps_prev: &toml::Table, deps_curr: &toml::Table) {
-    let mut path_printed = false;
+fn compare_deps_tables(
+    path_printed: &mut bool,
+    path_curr: &Path,
+    deps_prev: &toml::Table,
+    deps_curr: &toml::Table,
+) {
     for (name_prev, value_prev) in deps_prev {
         let result = (|| {
             let Some(value_curr) = deps_curr.get(name_prev) else {
@@ -117,15 +113,29 @@ fn compare_deps_tables(path_curr: &Path, deps_prev: &toml::Table, deps_curr: &to
         match result {
             Ok(None) => {}
             Ok(Some(msg)) => {
-                maybe_print_path(&mut path_printed, path_curr);
+                maybe_print_path(path_printed, path_curr);
                 println!("    {msg}");
             }
             Err(err) => {
-                maybe_print_path(&mut path_printed, path_curr);
+                maybe_print_path(path_printed, path_curr);
                 eprintln!("failed to compare `{name_prev}`: {err}");
             }
         }
     }
+}
+
+fn get_workspace_deps_table(manifest: &toml::Table) -> Option<&toml::Table> {
+    manifest
+        .get("workspace")
+        .and_then(|value| value.as_table())
+        .and_then(|table| table.get("dependencies"))
+        .and_then(|value| value.as_table())
+}
+
+fn get_package_deps_table(manifest: &toml::Table) -> Option<&toml::Table> {
+    manifest
+        .get("dependencies")
+        .and_then(|value| value.as_table())
 }
 
 fn compare_deps(

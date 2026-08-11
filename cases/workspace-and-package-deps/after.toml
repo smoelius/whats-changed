@@ -1,0 +1,11 @@
+[package]
+name = "test"
+version = "0.1.0"
+
+[dependencies]
+package_dep = "2.0"
+
+[workspace]
+
+[workspace.dependencies]
+workspace_dep = "2.0"
