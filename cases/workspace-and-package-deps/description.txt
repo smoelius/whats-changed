@@ -1,0 +1,2 @@
+Tests that workspace dependencies and package dependencies are both checked, in
+that order.

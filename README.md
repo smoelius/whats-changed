@@ -1,6 +1,6 @@
 # whats-changed
 
-Show Rust dependencies that were upgraded
+Show Rust dependencies that were upgraded or removed
 
 Example output:
 
@@ -13,25 +13,28 @@ backends/Cargo.toml
 
 ## How to run
 
-Run `whats-changed` in the root of a Git repository and pass exactly one argument, a revision `PREVIOUS`.
+Run `whats-changed` in the root of a Git repository. You may pass a revision, `PREVIOUS`, to compare against. If you omit it, the tool uses the most recent tag.
 
 ```sh
-whats-changed PREVIOUS
+whats-changed [PREVIOUS]
 ```
 
 ## How it works
 
-`whats-changed` does the essentially following:
+`whats-changed` does essentially the following:
 
-1. Clone the current repository into a temporary directory.
-2. Checkout `PREVIOUS`.
-3. For each dependency in the `[dependencies]` and `[workspace.dependencies]` sections of each Cargo.toml file in the current directory, compute the minimum version satisfying the dependency's version requirement.
-4. If the minimum version does not satisfy the requirement in `PREVIOUS`'s corresponding Cargo.toml file, report that the dependency was upgraded.
-5. If the dependency does not appear in `PREVIOUS`'s corresponding Cargo.toml file, report that it was removed.
+1. Use `git ls-files` to find tracked Cargo.toml files in the current repository.
+2. Read each manifest from the working tree and its previous version with `git show PREVIOUS:path/to/Cargo.toml`.
+3. Skip packages whose current manifest specifies `publish = false` and manifests that do not exist in `PREVIOUS`.
+4. Read the manifest's `[workspace.dependencies]` and `[dependencies]` tables, in that order.
+5. For each dependency in those tables from `PREVIOUS`:
+   - If it does not appear in the current table, report that it was removed.
+   - Otherwise, compute the minimum version satisfying its current version requirement. If that version does not satisfy the previous requirement, report that the dependency was upgraded.
 
 Notes:
 
 - `[dev-dependencies]` and `[build-dependencies]` are intentionally ignored.
+- Git dependencies, path dependencies, and dependencies inherited from a workspace are intentionally excluded from version comparisons.
 - Newly added dependencies are intentionally not reported; only upgrades and removals are.
 
 ## Known problems
