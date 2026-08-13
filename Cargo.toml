@@ -8,7 +8,7 @@ repository = "https://github.com/smoelius/whats-changed"
 
 [dependencies]
 anyhow = "1.0"
-elaborate = "1.1"
+elaborate = "2.0"
 semver = "1.0"
 toml = "1.1"
 
