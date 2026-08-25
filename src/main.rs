@@ -124,36 +124,37 @@ fn get_publish(manifest: &toml::Table) -> Option<bool> {
 }
 
 fn compare_manifests(manifest_prev: &toml::Table, manifest_curr: &toml::Table) -> Vec<Section> {
-    static EMPTY: LazyLock<toml::Table> = LazyLock::new(toml::Table::default);
-
-    let workspace_deps_prev = get_workspace_deps_table(manifest_prev);
-    let workspace_deps_curr = get_workspace_deps_table(manifest_curr);
-    let package_deps_prev = get_package_deps_table(manifest_prev);
-    let package_deps_curr = get_package_deps_table(manifest_curr);
-
     let mut sections = Vec::new();
-    if let Some(messages) = compare_deps_tables(
-        workspace_deps_prev.map_or(&EMPTY, |(deps, _)| deps),
-        workspace_deps_curr.map_or(&EMPTY, |(deps, _)| deps),
-    ) {
-        let owner = workspace_deps_curr
-            .map(|(_, owner)| owner)
-            .or_else(|| workspace_deps_prev.map(|(_, owner)| owner))
-            .unwrap();
-        sections.push(Section::new(owner, messages));
-    }
-
-    if let Some(messages) = compare_deps_tables(
-        package_deps_prev.map_or(&EMPTY, |(deps, _)| deps),
-        package_deps_curr.map_or(&EMPTY, |(deps, _)| deps),
-    ) {
-        let owner = package_deps_curr
-            .map(|(_, owner)| owner)
-            .or_else(|| package_deps_prev.map(|(_, owner)| owner))
-            .unwrap();
-        sections.push(Section::new(owner, messages));
-    }
+    push_section(
+        &mut sections,
+        get_workspace_deps_table(manifest_prev),
+        get_workspace_deps_table(manifest_curr),
+    );
+    push_section(
+        &mut sections,
+        get_package_deps_table(manifest_prev),
+        get_package_deps_table(manifest_curr),
+    );
     sections
+}
+
+fn push_section(
+    sections: &mut Vec<Section>,
+    deps_prev: Option<(&toml::Table, DependencyOwner<'_>)>,
+    deps_curr: Option<(&toml::Table, DependencyOwner<'_>)>,
+) {
+    static EMPTY: LazyLock<toml::Table> = LazyLock::new(toml::Table::default);
+    let Some(messages) = compare_deps_tables(
+        deps_prev.map_or(&EMPTY, |(deps, _)| deps),
+        deps_curr.map_or(&EMPTY, |(deps, _)| deps),
+    ) else {
+        return;
+    };
+    let owner = deps_curr
+        .map(|(_, owner)| owner)
+        .or_else(|| deps_prev.map(|(_, owner)| owner))
+        .unwrap();
+    sections.push(Section::new(owner, messages));
 }
 
 fn get_workspace_deps_table(manifest: &toml::Table) -> Option<(&toml::Table, DependencyOwner<'_>)> {
