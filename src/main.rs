@@ -70,16 +70,11 @@ fn compare_repo_to_curr(prev_rev: &str) -> Result<()> {
     command.args(["ls-files"]);
     let output = command.output_wc()?;
     ensure!(output.status.success(), "command failed: {command:?}");
+    let curr_paths = cargo_toml_paths(&output.stdout)?;
+
     let mut sections = Vec::new();
-    for line in output.stdout.split(|&byte| byte == b'\n') {
-        if line.is_empty() {
-            continue;
-        }
-        let path_curr_str = std::str::from_utf8(line)?;
+    for path_curr_str in &curr_paths {
         let path_curr = Path::new(path_curr_str);
-        if path_curr.file_name_wc()? != "Cargo.toml" {
-            continue;
-        }
         let manifest_curr = read_manifest(path_curr)?;
         if get_publish(&manifest_curr).is_some_and(|publish| !publish) {
             continue;
@@ -99,6 +94,30 @@ fn compare_repo_to_curr(prev_rev: &str) -> Result<()> {
         let manifest_sections = compare_manifests(&manifest_prev, &manifest_curr);
         sections.extend(manifest_sections);
     }
+
+    let mut command = Command::new("git");
+    command.args(["ls-tree", "-r", "--name-only", prev_rev]);
+    let output = command.output_wc()?;
+    ensure!(output.status.success(), "command failed: {command:?}");
+    let prev_paths = cargo_toml_paths(&output.stdout)?;
+
+    for path_prev_str in &prev_paths {
+        if curr_paths.contains(path_prev_str) {
+            continue;
+        }
+        let mut command = Command::new("git");
+        command.args(["show", &format!("{prev_rev}:{path_prev_str}")]);
+        let output = command.output_wc()?;
+        ensure!(output.status.success(), "command failed: {command:?}");
+        let contents_prev = std::str::from_utf8(&output.stdout)?;
+        let manifest_prev = contents_prev.parse::<toml::Table>()?;
+        if get_publish(&manifest_prev).is_some_and(|publish| !publish) {
+            continue;
+        }
+        let manifest_sections = compare_manifests(&manifest_prev, &toml::Table::new());
+        sections.extend(manifest_sections);
+    }
+
     if !sections.is_empty() {
         let markdown = sections
             .iter()
@@ -108,6 +127,21 @@ fn compare_repo_to_curr(prev_rev: &str) -> Result<()> {
         println!("{markdown}");
     }
     Ok(())
+}
+
+fn cargo_toml_paths(output: &[u8]) -> Result<Vec<String>> {
+    let mut paths = Vec::new();
+    for line in output.split(|&byte| byte == b'\n') {
+        if line.is_empty() {
+            continue;
+        }
+        let path_str = std::str::from_utf8(line)?;
+        if Path::new(path_str).file_name_wc()? != "Cargo.toml" {
+            continue;
+        }
+        paths.push(path_str.to_string());
+    }
+    Ok(paths)
 }
 
 fn read_manifest(manifest_path: impl AsRef<Path>) -> Result<toml::Table> {
