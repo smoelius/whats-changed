@@ -96,7 +96,7 @@ fn compare_repo_to_curr(prev_rev: &str) -> Result<()> {
         }
         let contents_prev = std::str::from_utf8(&output.stdout)?;
         let manifest_prev = contents_prev.parse::<toml::Table>()?;
-        let manifest_sections = compare_manifests(&manifest_prev, &manifest_curr)?;
+        let manifest_sections = compare_manifests(&manifest_prev, &manifest_curr);
         sections.extend(manifest_sections);
     }
     if !sections.is_empty() {
@@ -123,16 +123,13 @@ fn get_publish(manifest: &toml::Table) -> Option<bool> {
         .and_then(toml::Value::as_bool)
 }
 
-fn compare_manifests(
-    manifest_prev: &toml::Table,
-    manifest_curr: &toml::Table,
-) -> Result<Vec<Section>> {
+fn compare_manifests(manifest_prev: &toml::Table, manifest_curr: &toml::Table) -> Vec<Section> {
     static EMPTY: LazyLock<toml::Table> = LazyLock::new(toml::Table::default);
 
     let workspace_deps_prev = get_workspace_deps_table(manifest_prev);
     let workspace_deps_curr = get_workspace_deps_table(manifest_curr);
-    let package_deps_prev = get_package_deps_table(manifest_prev)?;
-    let package_deps_curr = get_package_deps_table(manifest_curr)?;
+    let package_deps_prev = get_package_deps_table(manifest_prev);
+    let package_deps_curr = get_package_deps_table(manifest_curr);
 
     let mut sections = Vec::new();
     if let Some(messages) = compare_deps_tables(
@@ -156,7 +153,7 @@ fn compare_manifests(
             .unwrap();
         sections.push(Section::new(owner, messages));
     }
-    Ok(sections)
+    sections
 }
 
 fn get_workspace_deps_table(manifest: &toml::Table) -> Option<(&toml::Table, DependencyOwner<'_>)> {
@@ -168,20 +165,15 @@ fn get_workspace_deps_table(manifest: &toml::Table) -> Option<(&toml::Table, Dep
     Some((deps, DependencyOwner::Workspace))
 }
 
-fn get_package_deps_table(
-    manifest: &toml::Table,
-) -> Result<Option<(&toml::Table, DependencyOwner<'_>)>> {
-    if let Some(deps) = manifest
+fn get_package_deps_table(manifest: &toml::Table) -> Option<(&toml::Table, DependencyOwner<'_>)> {
+    let deps = manifest
         .get("dependencies")
-        .and_then(|value| value.as_table())
-    {
-        let Some(name) = get_package_name(manifest) else {
-            bail!("package manifest has no name");
-        };
-        Ok(Some((deps, DependencyOwner::Package(name))))
-    } else {
-        Ok(None)
-    }
+        .and_then(|value| value.as_table())?;
+    let Some(name) = get_package_name(manifest) else {
+        eprintln!("package manifest has no name");
+        return None;
+    };
+    Some((deps, DependencyOwner::Package(name)))
 }
 
 fn get_package_name(manifest: &toml::Table) -> Option<&str> {
