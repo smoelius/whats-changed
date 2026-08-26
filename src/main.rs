@@ -114,7 +114,10 @@ fn compare_repo_to_curr(prev_rev: &str) -> Result<()> {
         let mut command = Command::new("git");
         command.args(["show", &format!("{prev_rev}:{path_prev_str}")]);
         let output = command.output_wc()?;
-        ensure!(output.status.success(), "command failed: {command:?}");
+        if !output.status.success() {
+            eprintln!("failed to read `{path_prev_str}` from previous revision");
+            continue;
+        }
         let contents_prev = std::str::from_utf8(&output.stdout)?;
         let manifest_prev = contents_prev.parse::<toml::Table>()?;
         if get_publish(&manifest_prev).is_some_and(|publish| !publish) {
