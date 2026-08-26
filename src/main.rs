@@ -85,18 +85,13 @@ fn compare_repo_to_curr(prev_rev: &str) -> Result<()> {
             continue;
         }
         let path_prev_str = renames.get(path_curr_str).unwrap_or(path_curr_str);
-        let mut command = Command::new("git");
-        command.args(["show", &format!("{prev_rev}:{path_prev_str}")]);
-        let output = command.output_wc()?;
-        if !output.status.success() {
-            eprintln!(
-                "`{}` does not exist in previous revision",
-                path_curr.display()
-            );
+        let warning = format!(
+            "`{}` does not exist in previous revision",
+            path_curr.display()
+        );
+        let Some(manifest_prev) = read_manifest_at_rev(prev_rev, path_prev_str, &warning)? else {
             continue;
-        }
-        let contents_prev = std::str::from_utf8(&output.stdout)?;
-        let manifest_prev = contents_prev.parse::<toml::Table>()?;
+        };
         let manifest_sections =
             compare_manifests(path_prev_str, &manifest_prev, path_curr_str, &manifest_curr);
         sections.extend(manifest_sections);
@@ -112,15 +107,10 @@ fn compare_repo_to_curr(prev_rev: &str) -> Result<()> {
         if curr_paths.contains(path_prev_str) || renames.values().any(|old| old == path_prev_str) {
             continue;
         }
-        let mut command = Command::new("git");
-        command.args(["show", &format!("{prev_rev}:{path_prev_str}")]);
-        let output = command.output_wc()?;
-        if !output.status.success() {
-            eprintln!("failed to read `{path_prev_str}` from previous revision");
+        let warning = format!("failed to read `{path_prev_str}` from previous revision");
+        let Some(manifest_prev) = read_manifest_at_rev(prev_rev, path_prev_str, &warning)? else {
             continue;
-        }
-        let contents_prev = std::str::from_utf8(&output.stdout)?;
-        let manifest_prev = contents_prev.parse::<toml::Table>()?;
+        };
         if get_publish(&manifest_prev).is_some_and(|publish| !publish) {
             continue;
         }
@@ -196,6 +186,19 @@ fn get_publish(manifest: &toml::Table) -> Option<bool> {
         .and_then(toml::Value::as_table)
         .and_then(|table| table.get("publish"))
         .and_then(toml::Value::as_bool)
+}
+
+fn read_manifest_at_rev(prev_rev: &str, path: &str, warning: &str) -> Result<Option<toml::Table>> {
+    let mut command = Command::new("git");
+    command.args(["show", &format!("{prev_rev}:{path}")]);
+    let output = command.output_wc()?;
+    if !output.status.success() {
+        eprintln!("{warning}");
+        return Ok(None);
+    }
+    let contents = std::str::from_utf8(&output.stdout)?;
+    let manifest = contents.parse::<toml::Table>()?;
+    Ok(Some(manifest))
 }
 
 fn compare_manifests(
