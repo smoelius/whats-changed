@@ -1,6 +1,7 @@
 use assert_cmd::{assert::OutputAssertExt, cargo::cargo_bin_cmd};
 use elaborate::std::fs::{
     DirEntryContext, copy_wc, create_dir_all_wc, read_dir_wc, read_to_string_wc, remove_file_wc,
+    write_wc,
 };
 use std::{path::Path, process::Command};
 use tempfile::tempdir;
@@ -31,17 +32,7 @@ fn run_case(case_dir: &Path) {
     let tempdir = tempdir().unwrap();
     let repo_dir = tempdir.path();
 
-    git(&["init"]).current_dir(repo_dir).assert().success();
-
-    git(&["config", "user.email", "test@test.com"])
-        .current_dir(repo_dir)
-        .assert()
-        .success();
-
-    git(&["config", "user.name", "Test"])
-        .current_dir(repo_dir)
-        .assert()
-        .success();
+    init_repo(repo_dir);
 
     copy_wc(case_dir.join("before.toml"), repo_dir.join("Cargo.toml")).unwrap();
 
@@ -50,19 +41,8 @@ fn run_case(case_dir: &Path) {
         copy_dir(&before_extra_dir, repo_dir);
     }
 
-    git(&["add", "-A"]).current_dir(repo_dir).assert().success();
-
-    git(&["commit", "-m", "init"])
-        .current_dir(repo_dir)
-        .assert()
-        .success();
-
-    let rev_parse = git(&["rev-parse", "HEAD"])
-        .current_dir(repo_dir)
-        .assert()
-        .success();
-    let prev_rev = String::from_utf8(rev_parse.get_output().stdout.clone()).unwrap();
-    let prev_rev = prev_rev.trim();
+    let prev_rev = commit_all(repo_dir);
+    let prev_rev = prev_rev.as_str();
 
     let tag_path = case_dir.join("tag.txt");
     if tag_path.exists() {
@@ -119,10 +99,49 @@ fn run_case(case_dir: &Path) {
         .stderr(expected_stderr);
 }
 
-fn git(args: &[&str]) -> Command {
-    let mut command = Command::new("git");
-    command.args(args);
-    command
+// `git ls-files` lists a tracked file even after it has been deleted from disk without staging
+// the deletion, which previously made `whats-changed` fail trying to read the missing file
+// instead of treating it as a removed package. This can't be expressed as a case under `cases/`,
+// since `run_case` always stages every change (`git add -A`) before running the binary.
+#[test]
+fn unstaged_deletion_is_reported_as_removed() {
+    let tempdir = tempdir().unwrap();
+    let repo_dir = tempdir.path();
+
+    init_repo(repo_dir);
+
+    write_wc(
+        repo_dir.join("Cargo.toml"),
+        "[package]\nname = \"test-package\"\n\n[dependencies]\nfoo = \"1.0\"\n",
+    )
+    .unwrap();
+
+    let prev_rev = commit_all(repo_dir);
+
+    // Delete the file from disk without staging the deletion (no `git rm`/`git add`).
+    remove_file_wc(repo_dir.join("Cargo.toml")).unwrap();
+
+    let mut cmd = cargo_bin_cmd!("whats-changed");
+    cmd.current_dir(repo_dir);
+    cmd.arg(&prev_rev);
+    cmd.assert()
+        .success()
+        .stdout("## Package: `test-package`\n\n- `foo` removed\n")
+        .stderr("");
+}
+
+fn init_repo(repo_dir: &Path) {
+    git(&["init"]).current_dir(repo_dir).assert().success();
+
+    git(&["config", "user.email", "test@test.com"])
+        .current_dir(repo_dir)
+        .assert()
+        .success();
+
+    git(&["config", "user.name", "Test"])
+        .current_dir(repo_dir)
+        .assert()
+        .success();
 }
 
 fn copy_dir(src: &Path, dst: &Path) {
@@ -137,6 +156,28 @@ fn copy_dir(src: &Path, dst: &Path) {
             copy_wc(&src_path, &dst_path).unwrap();
         }
     }
+}
+
+fn commit_all(repo_dir: &Path) -> String {
+    git(&["add", "-A"]).current_dir(repo_dir).assert().success();
+
+    git(&["commit", "-m", "init"])
+        .current_dir(repo_dir)
+        .assert()
+        .success();
+
+    let rev_parse = git(&["rev-parse", "HEAD"])
+        .current_dir(repo_dir)
+        .assert()
+        .success();
+    let prev_rev = String::from_utf8(rev_parse.get_output().stdout.clone()).unwrap();
+    prev_rev.trim().to_string()
+}
+
+fn git(args: &[&str]) -> Command {
+    let mut command = Command::new("git");
+    command.args(args);
+    command
 }
 
 fn remove_mirrored(src: &Path, dst: &Path) {

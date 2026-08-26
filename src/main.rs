@@ -77,7 +77,14 @@ fn compare_repo_to_curr(prev_rev: &str) -> Result<()> {
     command.args(["ls-files"]);
     let output = command.output_wc()?;
     ensure!(output.status.success(), "command failed: {command:?}");
-    let curr_paths = cargo_toml_paths(&output.stdout)?;
+    // `git ls-files` reflects the index, not the working tree, so a path can be listed here
+    // even though it was deleted from disk without staging the deletion. Filter those out so
+    // they fall through to the removed-manifest handling below instead of failing to read.
+    let all_curr_paths = cargo_toml_paths(&output.stdout)?;
+    let curr_paths: Vec<String> = all_curr_paths
+        .into_iter()
+        .filter(|path_str| Path::new(path_str).exists())
+        .collect();
 
     let renames = collect_cargo_toml_renames(prev_rev)?;
 
