@@ -242,10 +242,15 @@ fn push_section(
     ) else {
         return;
     };
-    let owner = deps_curr
+    // `compare_deps_tables` only produces messages by iterating `deps_prev`'s real entries, so
+    // a non-empty result requires the real (non-`EMPTY`) table to have been used on at least
+    // one side, which requires that side's `Option` to have been `Some`.
+    let Some(owner) = deps_curr
         .map(|(_, owner)| owner)
         .or_else(|| deps_prev.map(|(_, owner)| owner))
-        .unwrap();
+    else {
+        unreachable!("`compare_deps_tables` produced `messages` but neither side has an `owner`");
+    };
     sections.push(Section::new(owner, messages));
 }
 
