@@ -193,7 +193,6 @@ fn get_package_name(manifest: &toml::Table) -> Option<&str> {
 }
 
 fn compare_deps_tables(deps_prev: &toml::Table, deps_curr: &toml::Table) -> Option<Vec<String>> {
-    let mut had_errors = false;
     let mut messages = Vec::new();
     for (name_prev, value_prev) in deps_prev {
         let result = (|| {
@@ -208,12 +207,11 @@ fn compare_deps_tables(deps_prev: &toml::Table, deps_curr: &toml::Table) -> Opti
                 messages.push(msg);
             }
             Err(err) => {
-                had_errors = true;
                 eprintln!("failed to compare `{name_prev}`: {err}");
             }
         }
     }
-    (!messages.is_empty() || had_errors).then_some(messages)
+    (!messages.is_empty()).then_some(messages)
 }
 
 fn compare_deps(
