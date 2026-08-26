@@ -222,11 +222,22 @@ fn compare_manifests(
         get_workspace_deps_table(manifest_prev),
         get_workspace_deps_table(manifest_curr),
     );
-    push_section(
-        &mut sections,
+    match (
         get_package_deps_table(path_prev, manifest_prev),
         get_package_deps_table(path_curr, manifest_curr),
-    );
+    ) {
+        (PackageDeps::Unresolvable, _) | (_, PackageDeps::Unresolvable) => {
+            // Comparing one side's real table against a substituted empty table would
+            // misreport its dependencies as removed, so skip the comparison entirely.
+        }
+        (deps_prev, deps_curr) => {
+            push_section(
+                &mut sections,
+                deps_prev.into_option(),
+                deps_curr.into_option(),
+            );
+        }
+    }
     sections
 }
 
@@ -263,18 +274,33 @@ fn get_workspace_deps_table(manifest: &toml::Table) -> Option<(&toml::Table, Dep
     Some((deps, DependencyOwner::Workspace))
 }
 
-fn get_package_deps_table<'a>(
-    path: &str,
-    manifest: &'a toml::Table,
-) -> Option<(&'a toml::Table, DependencyOwner<'a>)> {
-    let deps = manifest
+enum PackageDeps<'a> {
+    NoTable,
+    Unresolvable,
+    Table(&'a toml::Table, DependencyOwner<'a>),
+}
+
+impl<'a> PackageDeps<'a> {
+    fn into_option(self) -> Option<(&'a toml::Table, DependencyOwner<'a>)> {
+        match self {
+            PackageDeps::Table(deps, owner) => Some((deps, owner)),
+            PackageDeps::NoTable | PackageDeps::Unresolvable => None,
+        }
+    }
+}
+
+fn get_package_deps_table<'a>(path: &str, manifest: &'a toml::Table) -> PackageDeps<'a> {
+    let Some(deps) = manifest
         .get("dependencies")
-        .and_then(|value| value.as_table())?;
+        .and_then(|value| value.as_table())
+    else {
+        return PackageDeps::NoTable;
+    };
     let Some(name) = get_package_name(manifest) else {
         eprintln!("`{path}` has a dependencies table but no package name");
-        return None;
+        return PackageDeps::Unresolvable;
     };
-    Some((deps, DependencyOwner::Package(name)))
+    PackageDeps::Table(deps, DependencyOwner::Package(name))
 }
 
 fn get_package_name(manifest: &toml::Table) -> Option<&str> {
