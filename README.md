@@ -24,21 +24,23 @@ whats-changed [PREVIOUS]
 
 `whats-changed` does essentially the following:
 
-1. Use `git ls-files` to find tracked Cargo.toml files in the current repository.
-2. Read each manifest from the working tree and its previous version with `git show PREVIOUS:path/to/Cargo.toml`.
-3. Skip packages whose current manifest specifies `publish = false` and manifests that do not exist in `PREVIOUS`.
-4. Read the manifest's `[workspace.dependencies]` and `[dependencies]` tables, in that order.
-5. For each dependency in those tables from `PREVIOUS`:
-   - If it does not appear in the current table, report that it was removed.
-   - Otherwise, compute the minimum version satisfying its current version requirement. If that version does not satisfy the previous requirement, report that the dependency was upgraded.
+1. Use `git ls-files` to find Cargo.toml files in the working tree, and `git ls-tree -r --name-only PREVIOUS` to find those that existed in `PREVIOUS`.
+2. Use `git diff --name-status -M PREVIOUS` to detect renamed Cargo.toml files, so a renamed package is compared against its own previous content rather than as two unrelated files.
+3. Read each manifest's previous version with `git show PREVIOUS:path/to/Cargo.toml`. A manifest present only in the working tree (and not a rename target) is skipped with a warning; a manifest present only in `PREVIOUS` (and not a rename source) is treated as a deleted package, and its dependencies are reported as removed.
+4. Skip packages whose manifest specifies `publish = false`.
+5. Read each manifest's `[workspace.dependencies]` and `[dependencies]` tables, in that order. A `[dependencies]` table with no resolvable `[package].name` triggers a warning and is skipped; `[workspace.dependencies]`, if present, is still compared.
+6. For each dependency in those tables from `PREVIOUS`:
+   - If it does not appear in the current table, report that it was removed — except for Git, path, and workspace-inherited dependencies, which are never reported as removed.
+   - Otherwise, compute the minimum version satisfying its current version requirement; report an upgrade if that version does not satisfy the previous requirement.
 
 Notes:
 
 - `[dev-dependencies]` and `[build-dependencies]` are intentionally ignored.
-- Git dependencies, path dependencies, and dependencies inherited from a workspace are intentionally excluded from version comparisons.
+- Git dependencies, path dependencies, and dependencies inherited from a workspace are intentionally excluded from version comparisons, including from being reported as removed.
 - Newly added dependencies are intentionally not reported; only upgrades and removals are.
+- If every dependency in a table fails to compare, a warning is printed for each failure, but no section heading is emitted for that table.
 
 ## Known problems
 
-- If Cargo.toml files were moved or directories were renamed, `whats-changed` may not work correctly.
+- Cargo.toml renames are detected using git's similarity heuristic (`git diff -M`); a rename combined with substantial content changes may not be recognized as a rename.
 - `whats-changed` does not handle all possible version requirements, e.g., requirements with multiple comparators.
