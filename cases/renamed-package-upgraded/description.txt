@@ -1,0 +1,3 @@
+Tests that whats-changed still reports a dependency upgrade for a package
+whose Cargo.toml path also changed (was renamed) since the previous
+revision.

@@ -1,0 +1,3 @@
+## Package: `test-package`
+
+- `foo` upgraded to version 2.0

@@ -1,6 +1,6 @@
 use assert_cmd::{assert::OutputAssertExt, cargo::cargo_bin_cmd};
 use elaborate::std::fs::{
-    DirEntryContext, copy_wc, create_dir_all_wc, read_dir_wc, read_to_string_wc,
+    DirEntryContext, copy_wc, create_dir_all_wc, read_dir_wc, read_to_string_wc, remove_file_wc,
 };
 use std::{path::Path, process::Command};
 use tempfile::tempdir;
@@ -45,10 +45,12 @@ fn run_case(case_dir: &Path) {
 
     copy_wc(case_dir.join("before.toml"), repo_dir.join("Cargo.toml")).unwrap();
 
-    git(&["add", "Cargo.toml"])
-        .current_dir(repo_dir)
-        .assert()
-        .success();
+    let before_extra_dir = case_dir.join("before_extra");
+    if before_extra_dir.exists() {
+        copy_dir(&before_extra_dir, repo_dir);
+    }
+
+    git(&["add", "-A"]).current_dir(repo_dir).assert().success();
 
     git(&["commit", "-m", "init"])
         .current_dir(repo_dir)
@@ -71,17 +73,26 @@ fn run_case(case_dir: &Path) {
 
     copy_wc(case_dir.join("after.toml"), repo_dir.join("Cargo.toml")).unwrap();
 
+    // Remove any `before_extra` files so that they are absent from the current working tree,
+    // unless `after_extra` re-creates them (e.g., at a renamed path).
+    if before_extra_dir.exists() {
+        remove_mirrored(&before_extra_dir, repo_dir);
+    }
+
     let extra_dir = case_dir.join("extra");
     if extra_dir.exists() {
         let repo_extra_dir = repo_dir.join("extra");
         create_dir_all_wc(&repo_extra_dir).unwrap();
         copy_dir(&extra_dir, &repo_extra_dir);
-        // Stage the extra files so that `git ls-files` includes them.
-        git(&["add", "extra"])
-            .current_dir(repo_dir)
-            .assert()
-            .success();
     }
+
+    let after_extra_dir = case_dir.join("after_extra");
+    if after_extra_dir.exists() {
+        copy_dir(&after_extra_dir, repo_dir);
+    }
+
+    // Stage additions and removals so that `git ls-files` reflects the current working tree.
+    git(&["add", "-A"]).current_dir(repo_dir).assert().success();
 
     let expected_status: i32 = read_to_string_wc(case_dir.join("status.txt"))
         .unwrap()
@@ -124,6 +135,19 @@ fn copy_dir(src: &Path, dst: &Path) {
             copy_dir(&src_path, &dst_path);
         } else {
             copy_wc(&src_path, &dst_path).unwrap();
+        }
+    }
+}
+
+fn remove_mirrored(src: &Path, dst: &Path) {
+    for entry in read_dir_wc(src).unwrap() {
+        let entry = entry.unwrap();
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        if entry.file_type_wc().unwrap().is_dir() {
+            remove_mirrored(&src_path, &dst_path);
+        } else {
+            remove_file_wc(&dst_path).unwrap();
         }
     }
 }
