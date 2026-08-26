@@ -256,6 +256,11 @@ fn compare_deps_tables(deps_prev: &toml::Table, deps_curr: &toml::Table) -> Opti
     for (name_prev, value_prev) in deps_prev {
         let result = (|| {
             let Some(value_curr) = deps_curr.get(name_prev) else {
+                // Don't report a git, path, or workspace-inherited dependency as removed; such
+                // dependencies are ignored when present too.
+                let Some(_) = get_req_from_value(value_prev)? else {
+                    return Ok(None);
+                };
                 return Ok(Some(format!("`{name_prev}` removed")));
             };
             compare_deps(name_prev, value_prev, value_curr)

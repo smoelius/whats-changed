@@ -3,3 +3,6 @@ name = "test-package"
 
 [dependencies]
 foo = "1.0"
+bar = { workspace = true }
+baz = { path = "../baz" }
+qux = { git = "https://example.com/qux" }
