@@ -2,7 +2,11 @@ use anyhow::{Result, bail, ensure};
 use elaborate::std::{fs::read_to_string_wc, path::PathContext, process::CommandContext};
 use semver::{BuildMetadata, Comparator, Op, Version, VersionReq};
 use std::{
-    collections::HashMap, convert::identity, env::args, path::Path, process::Command,
+    collections::{HashMap, HashSet},
+    convert::identity,
+    env::args,
+    path::Path,
+    process::Command,
     sync::LazyLock,
 };
 
@@ -103,8 +107,13 @@ fn compare_repo_to_curr(prev_rev: &str) -> Result<()> {
     ensure!(output.status.success(), "command failed: {command:?}");
     let prev_paths = cargo_toml_paths(&output.stdout)?;
 
+    let curr_paths_set: HashSet<&str> = curr_paths.iter().map(String::as_str).collect();
+    let renamed_old_paths: HashSet<&str> = renames.values().map(String::as_str).collect();
+
     for path_prev_str in &prev_paths {
-        if curr_paths.contains(path_prev_str) || renames.values().any(|old| old == path_prev_str) {
+        if curr_paths_set.contains(path_prev_str.as_str())
+            || renamed_old_paths.contains(path_prev_str.as_str())
+        {
             continue;
         }
         let warning = format!("failed to read `{path_prev_str}` from previous revision");
