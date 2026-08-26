@@ -1,0 +1,4 @@
+Tests that whats-changed skips comparing the [dependencies] table of a
+Cargo.toml that has no resolvable [package].name, while still emitting a
+warning on stderr (naming the file) for each revision in which the name
+could not be resolved.
