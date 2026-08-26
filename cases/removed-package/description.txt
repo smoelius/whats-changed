@@ -1,3 +1,6 @@
-Tests that whats-changed reports every dependency of a package as removed
-when that package's Cargo.toml no longer exists anywhere in the current
-working tree (i.e., the package itself was deleted, not merely renamed).
+Tests that whats-changed reports a deleted package's trackable
+dependencies as removed when that package's Cargo.toml no longer exists
+anywhere in the current working tree (i.e., the package itself was
+deleted, not merely renamed), while silently skipping its git, path, and
+workspace-inherited dependencies, just as it does for a package that
+still exists.
