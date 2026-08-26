@@ -1,0 +1,3 @@
+Tests that whats-changed reports every dependency of a package as removed
+when that package's Cargo.toml no longer exists anywhere in the current
+working tree (i.e., the package itself was deleted, not merely renamed).

@@ -1,0 +1,3 @@
+Tests that whats-changed does not report a package's dependencies as
+removed when only the package's Cargo.toml path changes (e.g., due to a
+directory rename) and the dependencies themselves are unchanged.
