@@ -1,0 +1,4 @@
+Tests that whats-changed does not misreport a package's dependencies as
+removed when the current manifest loses its resolvable [package].name but
+the dependencies themselves are unchanged; the entire package-level
+comparison is skipped instead, with a warning on stderr.
