@@ -97,7 +97,8 @@ fn compare_repo_to_curr(prev_rev: &str) -> Result<()> {
         }
         let contents_prev = std::str::from_utf8(&output.stdout)?;
         let manifest_prev = contents_prev.parse::<toml::Table>()?;
-        let manifest_sections = compare_manifests(&manifest_prev, &manifest_curr);
+        let manifest_sections =
+            compare_manifests(path_prev_str, &manifest_prev, path_curr_str, &manifest_curr);
         sections.extend(manifest_sections);
     }
 
@@ -123,7 +124,12 @@ fn compare_repo_to_curr(prev_rev: &str) -> Result<()> {
         if get_publish(&manifest_prev).is_some_and(|publish| !publish) {
             continue;
         }
-        let manifest_sections = compare_manifests(&manifest_prev, &toml::Table::new());
+        let manifest_sections = compare_manifests(
+            path_prev_str,
+            &manifest_prev,
+            path_prev_str,
+            &toml::Table::new(),
+        );
         sections.extend(manifest_sections);
     }
 
@@ -192,7 +198,12 @@ fn get_publish(manifest: &toml::Table) -> Option<bool> {
         .and_then(toml::Value::as_bool)
 }
 
-fn compare_manifests(manifest_prev: &toml::Table, manifest_curr: &toml::Table) -> Vec<Section> {
+fn compare_manifests(
+    path_prev: &str,
+    manifest_prev: &toml::Table,
+    path_curr: &str,
+    manifest_curr: &toml::Table,
+) -> Vec<Section> {
     let mut sections = Vec::new();
     push_section(
         &mut sections,
@@ -201,8 +212,8 @@ fn compare_manifests(manifest_prev: &toml::Table, manifest_curr: &toml::Table) -
     );
     push_section(
         &mut sections,
-        get_package_deps_table(manifest_prev),
-        get_package_deps_table(manifest_curr),
+        get_package_deps_table(path_prev, manifest_prev),
+        get_package_deps_table(path_curr, manifest_curr),
     );
     sections
 }
@@ -235,12 +246,15 @@ fn get_workspace_deps_table(manifest: &toml::Table) -> Option<(&toml::Table, Dep
     Some((deps, DependencyOwner::Workspace))
 }
 
-fn get_package_deps_table(manifest: &toml::Table) -> Option<(&toml::Table, DependencyOwner<'_>)> {
+fn get_package_deps_table<'a>(
+    path: &str,
+    manifest: &'a toml::Table,
+) -> Option<(&'a toml::Table, DependencyOwner<'a>)> {
     let deps = manifest
         .get("dependencies")
         .and_then(|value| value.as_table())?;
     let Some(name) = get_package_name(manifest) else {
-        eprintln!("package manifest has no name");
+        eprintln!("`{path}` has a dependencies table but no package name");
         return None;
     };
     Some((deps, DependencyOwner::Package(name)))
