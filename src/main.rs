@@ -1,7 +1,10 @@
 use anyhow::{Result, bail, ensure};
 use elaborate::std::{fs::read_to_string_wc, path::PathContext, process::CommandContext};
 use semver::{BuildMetadata, Comparator, Op, Version, VersionReq};
-use std::{convert::identity, env::args, path::Path, process::Command, sync::LazyLock};
+use std::{
+    collections::HashMap, convert::identity, env::args, path::Path, process::Command,
+    sync::LazyLock,
+};
 
 #[derive(Clone, Copy)]
 enum DependencyOwner<'a> {
@@ -72,6 +75,8 @@ fn compare_repo_to_curr(prev_rev: &str) -> Result<()> {
     ensure!(output.status.success(), "command failed: {command:?}");
     let curr_paths = cargo_toml_paths(&output.stdout)?;
 
+    let renames = collect_cargo_toml_renames(prev_rev)?;
+
     let mut sections = Vec::new();
     for path_curr_str in &curr_paths {
         let path_curr = Path::new(path_curr_str);
@@ -79,8 +84,9 @@ fn compare_repo_to_curr(prev_rev: &str) -> Result<()> {
         if get_publish(&manifest_curr).is_some_and(|publish| !publish) {
             continue;
         }
+        let path_prev_str = renames.get(path_curr_str).unwrap_or(path_curr_str);
         let mut command = Command::new("git");
-        command.args(["show", &format!("{prev_rev}:{path_curr_str}")]);
+        command.args(["show", &format!("{prev_rev}:{path_prev_str}")]);
         let output = command.output_wc()?;
         if !output.status.success() {
             eprintln!(
@@ -102,7 +108,7 @@ fn compare_repo_to_curr(prev_rev: &str) -> Result<()> {
     let prev_paths = cargo_toml_paths(&output.stdout)?;
 
     for path_prev_str in &prev_paths {
-        if curr_paths.contains(path_prev_str) {
+        if curr_paths.contains(path_prev_str) || renames.values().any(|old| old == path_prev_str) {
             continue;
         }
         let mut command = Command::new("git");
@@ -142,6 +148,32 @@ fn cargo_toml_paths(output: &[u8]) -> Result<Vec<String>> {
         paths.push(path_str.to_string());
     }
     Ok(paths)
+}
+
+fn collect_cargo_toml_renames(prev_rev: &str) -> Result<HashMap<String, String>> {
+    let mut command = Command::new("git");
+    command.args(["diff", "--name-status", "-M", "--diff-filter=R", prev_rev]);
+    let output = command.output_wc()?;
+    ensure!(output.status.success(), "command failed: {command:?}");
+    let mut renames = HashMap::new();
+    for line in output.stdout.split(|&byte| byte == b'\n') {
+        if line.is_empty() {
+            continue;
+        }
+        let line_str = std::str::from_utf8(line)?;
+        let mut fields = line_str.split('\t');
+        let (Some(_status), Some(path_prev_str), Some(path_curr_str)) =
+            (fields.next(), fields.next(), fields.next())
+        else {
+            continue;
+        };
+        if Path::new(path_prev_str).file_name_wc()? == "Cargo.toml"
+            && Path::new(path_curr_str).file_name_wc()? == "Cargo.toml"
+        {
+            renames.insert(path_curr_str.to_string(), path_prev_str.to_string());
+        }
+    }
+    Ok(renames)
 }
 
 fn read_manifest(manifest_path: impl AsRef<Path>) -> Result<toml::Table> {
