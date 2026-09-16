@@ -1,0 +1,1 @@
+A wildcard requirement with zero comparators emits a warning and no section.
