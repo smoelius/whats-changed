@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.0
+
+- Display caret requirements as compatibility prefixes ([8fa22bd](https://github.com/smoelius/whats-changed/commit/8fa22bdf919fc6f084b1225883ff829e3754460d))
+
 ## 1.0.0
 
 - BREAKING: Always check `workspace.dependencies` followed by `dependencies` ([5d798d2](https://github.com/smoelius/whats-changed/commit/5d798d2a2391b80688f681a049afaf9932fbbeb6))
