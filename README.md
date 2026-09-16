@@ -7,7 +7,7 @@ Example output:
 ```markdown
 ## Package: `swc_ecma_parser`
 
-- `swc_core` upgraded to version 55.0
+- `swc_core` upgraded to version 55
 - `toml_edit` upgraded to version 0.24
 - `tree-sitter` upgraded to version 0.26
 ```
@@ -38,6 +38,7 @@ Notes:
 - `[dev-dependencies]` and `[build-dependencies]` are intentionally ignored.
 - Git dependencies, path dependencies, and dependencies inherited from a workspace are intentionally excluded from version comparisons, including from being reported as removed.
 - Newly added dependencies are intentionally not reported; only upgrades and removals are.
+- Ordinary caret requirements are displayed as compatibility prefixes (for example, `1`, `0.2`, or `0.0.3`). Exact requirements and prereleases retain their full requirement, with a leading `=` omitted.
 - If every dependency in a table fails to compare, a warning is printed for each failure, but no section heading is emitted for that table.
 
 ## Known problems

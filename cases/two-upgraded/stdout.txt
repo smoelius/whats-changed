@@ -1,4 +1,4 @@
 ## Package: `test-package`
 
-- `bar` upgraded to version 2.0
-- `foo` upgraded to version 2.0
+- `bar` upgraded to version 2
+- `foo` upgraded to version 2

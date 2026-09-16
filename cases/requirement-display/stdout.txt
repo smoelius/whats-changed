@@ -1,0 +1,9 @@
+## Package: `test-package`
+
+- `caret_major` upgraded to version 2
+- `caret_minor` upgraded to version 0.3
+- `caret_patch` upgraded to version 0.0.4
+- `caret_prerelease` upgraded to version ^1.3.3-beta.1
+- `exact_partial` upgraded to version 1.3
+- `exact_patch` upgraded to version 1.2.4
+- `prerelease` upgraded to version 1.2.3-alpha.2
