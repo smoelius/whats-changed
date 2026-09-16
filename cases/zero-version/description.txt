@@ -1,0 +1,1 @@
+Upgrading an exact prerelease to 0.0.0 preserves all three zero components in the compatibility prefix.

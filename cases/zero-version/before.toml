@@ -1,0 +1,5 @@
+[package]
+name = "test-package"
+
+[dependencies]
+foo = "=0.0.0-alpha.1"

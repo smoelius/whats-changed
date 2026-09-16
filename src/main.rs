@@ -1,5 +1,6 @@
 use anyhow::{Result, bail, ensure};
 use elaborate::std::{fs::read_to_string_wc, path::PathContext, process::CommandContext};
+use itertools::Itertools;
 use semver::{BuildMetadata, Comparator, Op, Version, VersionReq};
 use std::{
     collections::{HashMap, HashSet},
@@ -356,19 +357,17 @@ fn compare_deps(
     let Some(req_curr) = get_req_from_value(value_curr)? else {
         return Ok(None);
     };
-    let minimum_version = minimum_version_for_req(&req_curr)?;
+    let VersionReq { comparators } = &req_curr;
+    let [comparator] = comparators.as_slice() else {
+        bail!("unexpected number of comparators: {}", comparators.len());
+    };
+    let minimum_version = minimum_version_for_comparator(comparator)?;
     if req_prev.matches(&minimum_version) {
         Ok(None)
     } else {
-        let req_with_op = req_curr.to_string();
-        let index_of_first_digit = req_with_op
-            .as_bytes()
-            .iter()
-            .position(u8::is_ascii_digit)
-            .unwrap();
         Ok(Some(format!(
             "`{name}` upgraded to version {}",
-            &req_with_op[index_of_first_digit..]
+            display_comparator(comparator)
         )))
     }
 }
@@ -414,11 +413,7 @@ fn get_req_from_value(value: &toml::Value) -> Result<Option<VersionReq>> {
     Ok(Some(req))
 }
 
-fn minimum_version_for_req(req: &VersionReq) -> Result<Version> {
-    let VersionReq { comparators } = req;
-    let [comparator] = comparators.as_slice() else {
-        bail!("unexpected number of comparators: {}", comparators.len());
-    };
+fn minimum_version_for_comparator(comparator: &Comparator) -> Result<Version> {
     let Comparator {
         op,
         major,
@@ -440,4 +435,28 @@ fn minimum_version_for_req(req: &VersionReq) -> Result<Version> {
         }
         _ => bail!("unexpected operator: {op:?}"),
     }
+}
+
+fn display_comparator(comparator: &Comparator) -> String {
+    if comparator.op == Op::Caret && comparator.pre.is_empty() {
+        return compatibility_prefix(comparator);
+    }
+    let comparator = comparator.to_string();
+    comparator.trim_start_matches('=').to_string()
+}
+
+fn compatibility_prefix(comparator: &Comparator) -> String {
+    let Comparator {
+        major,
+        minor,
+        patch,
+        ..
+    } = *comparator;
+    let minor = minor.unwrap_or(0);
+    let patch = patch.unwrap_or(0);
+    let values = [major, minor, patch];
+    values
+        .into_iter()
+        .take_while_inclusive(|&value| value == 0)
+        .join(".")
 }

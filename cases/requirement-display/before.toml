@@ -1,0 +1,11 @@
+[package]
+name = "test-package"
+
+[dependencies]
+caret_major = "1.2.3"
+caret_minor = "0.2"
+caret_patch = "0.0.3"
+caret_prerelease = "1.2.3-alpha.1"
+exact_partial = "=1.2"
+exact_patch = "=1.2.3"
+prerelease = "=1.2.3-alpha.1"

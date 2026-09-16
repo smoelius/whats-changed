@@ -1,0 +1,1 @@
+Preserve exact requirements and prereleases while shortening ordinary caret requirements to compatibility prefixes.
