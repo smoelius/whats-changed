@@ -43,7 +43,11 @@ jobs:
           rustup update
           rustup install nightly
           rustup component add clippy rustfmt --toolchain nightly
-          cargo install unset                    || true
+
+      - name: Build
+        run: cargo build --all-targets
 
       - name: Test
-        run: cargo test --config "target.'cfg(all())'.runner = 'unset'"
+        run: |
+          unset CARGO_TERM_COLOR
+          cargo test
